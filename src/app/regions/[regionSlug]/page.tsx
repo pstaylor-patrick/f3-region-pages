@@ -25,6 +25,29 @@ export async function generateStaticParams() {
     }));
 }
 
+// Helper function to extract city and state from address
+function extractCityAndState(location: string): string {
+    const parts = location.split(',').map(part => part.trim());
+    
+    // Check if this is a US address (contains a 2-letter state code)
+    const stateIndex = parts.findIndex(part => /^\s*[A-Z]{2}\b/.test(part));
+    
+    if (stateIndex > 0) {
+        // US address format
+        const city = parts[stateIndex - 1];
+        const state = parts[stateIndex].trim().split(' ')[0]; // Get just the state abbreviation
+        return `${city}, ${state}`;
+    } else {
+        // International address - find the country (usually the last non-empty part)
+        const country = parts.reverse().find(part => 
+            part && 
+            !/^\d+$/.test(part) && // Skip postal codes
+            !/^[A-Z0-9\s-]+$/.test(part) // Skip postal codes in various formats
+        );
+        return country || location;
+    }
+}
+
 export async function generateMetadata(
     { params }: { params: Promise<{ regionSlug: string }> },
     parent: Promise<Metadata>
@@ -38,8 +61,9 @@ export async function generateMetadata(
     }
     
     const regionName = workouts[0].Region;
-    const title = `F3 Workouts in ${regionName}`;
-    const description = `Find F3 workout locations, schedules, and details for the ${regionName} region`;
+    const location = extractCityAndState(workouts[0].Location);
+    const title = `F3 Workouts in ${regionName} - ${location}`;
+    const description = `Find F3 workout locations and schedules in the ${regionName} region. Join us for workouts in ${location}. Free, peer-led outdoor workouts for men.`;
     
     return {
         title,
@@ -48,12 +72,15 @@ export async function generateMetadata(
             title,
             description,
             type: 'website',
+            siteName: 'F3 Workout Locations',
+            locale: 'en_US',
         },
         twitter: {
             card: 'summary',
             title,
             description,
         },
+        keywords: [`F3 ${regionName}`, `F3 ${location}`, 'F3 workouts', 'mens fitness', 'outdoor workouts', 'peer fitness'],
     };
 }
 
