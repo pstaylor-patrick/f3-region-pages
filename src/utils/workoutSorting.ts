@@ -161,7 +161,13 @@ export const sortWorkoutsByDayAndTime = (workouts: WorkoutLocation[]): WorkoutLo
             currentTimeInMinutes
         );
 
-        return minutesUntilA - minutesUntilB;
+        // Primary sort by minutes until workout
+        if (minutesUntilA !== minutesUntilB) {
+            return minutesUntilA - minutesUntilB;
+        }
+
+        // Secondary sort by name if times are identical
+        return (a.Name || '').localeCompare(b.Name || '');
     });
 
     if (process.env.NODE_ENV !== 'production') {
