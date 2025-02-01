@@ -6,10 +6,19 @@ export interface WorkoutLocation {
     'Entry ID': string;
     Region: string;
     Location: string;
-    Day: string;
+    Group: string;
     'Workout Type': string;
     Time: string;
-    Coordinates: string;
+    Type: string;
+    Name: string;
+    Description: string;
+    Notes: string;
     Website?: string;
-    'Additional Details'?: string;
+    Latitude: string;
+    Longitude: string;
+    'Marker Icon'?: string;
+    'Marker Color'?: string;
+    'Icon Color'?: string;
+    'Custom Size'?: string;
+    Image?: string;
 } 

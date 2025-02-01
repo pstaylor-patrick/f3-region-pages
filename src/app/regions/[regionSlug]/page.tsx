@@ -5,8 +5,8 @@ import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
 import Link from 'next/link';
 import { fetchWorkoutLocationsByRegion, fetchRegionSlugs } from '@/utils/fetchWorkoutLocations';
-import { WorkoutCard } from '@/components/WorkoutCard';
 import { RegionHeader } from '@/components/RegionHeader';
+import { WorkoutList } from '@/components/WorkoutList';
 import { WorkoutLocation } from '@/types/workoutLocation';
 import { sortWorkoutsByDayAndTime } from '@/utils/workoutSorting';
 
@@ -105,14 +105,7 @@ export default async function RegionPage({ params }: RegionProps) {
             />
             
             <h2 className="text-2xl font-semibold mb-4">Workouts</h2>
-            <div className="grid gap-4 md:grid-cols-2">
-                {sortedWorkouts.map((workout: WorkoutLocation) => (
-                    <WorkoutCard 
-                        key={workout['Entry ID']}
-                        workout={workout}
-                    />
-                ))}
-            </div>
+            <WorkoutList workouts={sortedWorkouts} />
         </div>
     );
 }
