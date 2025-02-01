@@ -19,6 +19,43 @@ const DAYS_ORDER = [
 
 type DayOfWeek = typeof DAYS_ORDER[number];
 
+// Map abbreviated days to full names
+const DAY_ALIASES: { [key: string]: string } = {
+    'sun': 'Sunday',
+    'mon': 'Monday',
+    'tue': 'Tuesday',
+    'wed': 'Wednesday',
+    'th': 'Thursday',
+    'thu': 'Thursday',
+    'thur': 'Thursday',
+    'thurs': 'Thursday',
+    'fri': 'Friday',
+    'sat': 'Saturday'
+};
+
+/**
+ * Normalize day name to handle abbreviations
+ */
+const normalizeDayName = (day: string): string => {
+    const lowercaseDay = day.toLowerCase();
+    // First check aliases
+    if (DAY_ALIASES[lowercaseDay]) {
+        return DAY_ALIASES[lowercaseDay];
+    }
+    // Then check if it's a full day name (case insensitive)
+    const fullDay = DAYS_ORDER.find(d => d.toLowerCase() === lowercaseDay);
+    if (fullDay) {
+        return fullDay;
+    }
+    // Finally check if it's a prefix of any day name
+    for (const fullDayName of DAYS_ORDER) {
+        if (fullDayName.toLowerCase().startsWith(lowercaseDay)) {
+            return fullDayName;
+        }
+    }
+    return day;
+};
+
 interface ParsedTime {
     hour24: number;
     minutes: number;
@@ -34,34 +71,50 @@ const parseTime = (timeStr: string): ParsedTime => {
     try {
         // Extract start time from range (e.g., "05:00 AM - 05:45 AM" → "05:00 AM")
         const startTime = timeStr.split('-')[0]?.trim();
-        if (!startTime) throw new Error('Invalid time format: missing time component');
+        if (!startTime) {
+            console.warn(`Invalid time format (missing time component): "${timeStr}"`);
+            return { hour24: 0, minutes: 0, totalMinutes: 0 };
+        }
 
-        // Split into time and period (e.g., "05:00 AM" → ["05:00", "AM"])
-        const [time, periodRaw] = startTime.split(' ');
-        if (!time || !periodRaw) throw new Error('Invalid time format: missing time or period');
+        // Split into time and period parts
+        const [timePart, periodPart] = startTime.split(' ');
+        if (!timePart || !periodPart) {
+            console.warn(`Invalid time format (missing time or period): "${timeStr}"`);
+            return { hour24: 0, minutes: 0, totalMinutes: 0 };
+        }
 
-        // Split hours and minutes (e.g., "05:00" → ["05", "00"])
-        const [hours, minutes] = time.split(':').map(Number);
-        if (isNaN(hours) || isNaN(minutes)) throw new Error('Invalid time format: hours or minutes not numeric');
+        // Split hours and minutes
+        const [hoursStr, minutesStr] = timePart.split(':');
+        const hours = parseInt(hoursStr, 10);
+        const minutes = parseInt(minutesStr, 10);
 
-        const period = periodRaw.toUpperCase();
-        if (period !== 'AM' && period !== 'PM') throw new Error('Invalid time format: period must be AM or PM');
+        if (isNaN(hours) || isNaN(minutes)) {
+            console.warn(`Invalid time format (non-numeric hours/minutes): "${timeStr}"`);
+            return { hour24: 0, minutes: 0, totalMinutes: 0 };
+        }
+
+        // Validate hours and minutes
+        if (hours < 1 || hours > 12 || minutes < 0 || minutes > 59) {
+            console.warn(`Invalid time values (hours: ${hours}, minutes: ${minutes}): "${timeStr}"`);
+            return { hour24: 0, minutes: 0, totalMinutes: 0 };
+        }
 
         // Convert to 24-hour format
+        const period = periodPart.toUpperCase();
+        if (period !== 'AM' && period !== 'PM') {
+            console.warn(`Invalid period (must be AM/PM): "${timeStr}"`);
+            return { hour24: 0, minutes: 0, totalMinutes: 0 };
+        }
+
         let hour24 = hours;
         if (period === 'PM' && hours !== 12) hour24 += 12;
         else if (period === 'AM' && hours === 12) hour24 = 0;
 
         const totalMinutes = (hour24 * MINUTES_IN_HOUR) + minutes;
 
-        if (process.env.NODE_ENV !== 'production') {
-            console.log(`Parsing time: ${timeStr} => ${hour24}:${minutes} (${totalMinutes} minutes)`);
-        }
-
         return { hour24, minutes, totalMinutes };
     } catch (error) {
-        console.error(`Error parsing time "${timeStr}":`, error);
-        // Return midnight as fallback
+        console.warn(`Error parsing time: "${timeStr}"`, error);
         return { hour24: 0, minutes: 0, totalMinutes: 0 };
     }
 };
@@ -71,15 +124,10 @@ const parseTime = (timeStr: string): ParsedTime => {
  */
 const getCurrentTime = () => {
     const now = new Date();
-    const currentDayIndex = now.getDay();
-    const currentTimeInMinutes = (now.getHours() * MINUTES_IN_HOUR) + now.getMinutes();
-
-    if (process.env.NODE_ENV !== 'production') {
-        console.log(`Current time: ${now.getHours()}:${now.getMinutes()} (${currentTimeInMinutes} minutes)`);
-        console.log('Current day:', DAYS_ORDER[currentDayIndex], `(index: ${currentDayIndex})`);
-    }
-
-    return { currentDayIndex, currentTimeInMinutes };
+    return {
+        currentDayIndex: now.getDay(),
+        currentTimeInMinutes: (now.getHours() * MINUTES_IN_HOUR) + now.getMinutes()
+    };
 };
 
 /**
@@ -92,10 +140,15 @@ const calculateMinutesUntilWorkout = (
     currentDayIndex: number,
     currentTimeInMinutes: number
 ): number => {
+    // Handle invalid day index
+    if (workoutDayIndex === -1) {
+        return Number.MAX_SAFE_INTEGER;
+    }
+
     // Calculate days until workout (0-6)
     let daysUntil = workoutDayIndex - currentDayIndex;
     if (daysUntil < 0) {
-        daysUntil += DAYS_IN_WEEK; // Move to next week
+        daysUntil += DAYS_IN_WEEK;
     }
 
     // Calculate minutes until workout
@@ -107,47 +160,28 @@ const calculateMinutesUntilWorkout = (
         minutesUntil = workoutTimeInMinutes;
     }
 
-    // If workout is today and hasn't passed, use actual minutes until
-    if (daysUntil === 0 && minutesUntil >= 0) {
-        minutesUntil = workoutTimeInMinutes - currentTimeInMinutes;
-    }
-
-    // If workout is on a future day, use full minutes from start of that day
-    if (daysUntil > 0) {
-        minutesUntil = workoutTimeInMinutes;
-    }
-
     // Calculate final position (minutes until workout)
-    const totalMinutesUntil = (daysUntil * MINUTES_IN_DAY) + minutesUntil;
-
-    if (process.env.NODE_ENV !== 'production') {
-        console.log(
-            `Position calc for ${DAYS_ORDER[workoutDayIndex]} at ${workoutTimeInMinutes} mins:`,
-            `${daysUntil} days until,`,
-            `${minutesUntil} mins until =`,
-            `position ${totalMinutesUntil}`
-        );
-    }
-
-    return totalMinutesUntil;
+    return (daysUntil * MINUTES_IN_DAY) + minutesUntil;
 };
 
 /**
  * Sort workouts by next occurrence, taking into account current time
  * Workouts that have already occurred today are moved to next week
+ * If times are identical, sorts by workout name
  */
 export const sortWorkoutsByDayAndTime = (workouts: WorkoutLocation[]): WorkoutLocation[] => {
     const { currentDayIndex, currentTimeInMinutes } = getCurrentTime();
 
-    const sorted = [...workouts].sort((a, b) => {
-        // Get day indices, defaulting to end of week if day is invalid
+    return [...workouts].sort((a, b) => {
+        // Get day indices
         const dayIndexA = DAYS_ORDER.indexOf(a.Group as DayOfWeek);
         const dayIndexB = DAYS_ORDER.indexOf(b.Group as DayOfWeek);
         
-        // Parse times, defaulting to end of day if time is invalid
+        // Parse times
         const timeA = parseTime(a.Time).totalMinutes;
         const timeB = parseTime(b.Time).totalMinutes;
 
+        // Calculate minutes until each workout
         const minutesUntilA = calculateMinutesUntilWorkout(
             dayIndexA, 
             timeA, 
@@ -162,26 +196,12 @@ export const sortWorkoutsByDayAndTime = (workouts: WorkoutLocation[]): WorkoutLo
         );
 
         // Primary sort by minutes until workout
-        if (minutesUntilA !== minutesUntilB) {
-            return minutesUntilA - minutesUntilB;
+        const timeDiff = minutesUntilA - minutesUntilB;
+        if (timeDiff !== 0) {
+            return timeDiff;
         }
 
         // Secondary sort by name if times are identical
         return (a.Name || '').localeCompare(b.Name || '');
     });
-
-    if (process.env.NODE_ENV !== 'production') {
-        console.log('Sorted workouts:', sorted.map(w => ({
-            day: w.Group,
-            time: w.Time,
-            minutesUntil: calculateMinutesUntilWorkout(
-                DAYS_ORDER.indexOf(w.Group as DayOfWeek),
-                parseTime(w.Time).totalMinutes,
-                currentDayIndex,
-                currentTimeInMinutes
-            )
-        })));
-    }
-
-    return sorted;
 }; 
