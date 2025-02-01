@@ -26,42 +26,33 @@ export async function generateStaticParams() {
 }
 
 export async function generateMetadata(
-    { params }: RegionProps,
+    { params }: { params: Promise<{ regionSlug: string }> },
     parent: Promise<Metadata>
 ): Promise<Metadata> {
-    // Wait for both parent metadata and params
-    const [parentMetadata, resolvedParams] = await Promise.all([
-        parent,
-        params
-    ]);
-
-    // Validate that the region exists
-    const regions = await fetchRegionSlugs();
-    if (!regions.includes(resolvedParams.regionSlug)) {
-        return {
-            ...parentMetadata,
-            title: 'Region Not Found'
-        };
+    const resolvedParams = await params;
+    const regionSlug = resolvedParams.regionSlug;
+    const workouts = await fetchWorkoutLocationsByRegion(regionSlug);
+    
+    if (!workouts || workouts.length === 0) {
+        return notFound();
     }
-
-    // Fetch the region data
-    const regionData = await fetchWorkoutLocationsByRegion(resolvedParams.regionSlug);
-    if (!regionData || regionData.length === 0) {
-        return {
-            ...parentMetadata,
-            title: 'Region Not Found'
-        };
-    }
-
-    const regionName = regionData[0].Region;
+    
+    const regionName = workouts[0].Region;
+    const title = `F3 Workouts in ${regionName}`;
+    const description = `Find F3 workout locations, schedules, and details for the ${regionName} region`;
     
     return {
-        title: `F3 ${regionName}`,
-        description: `Workout locations and schedule for F3 ${regionName}`,
+        title,
+        description,
         openGraph: {
-            title: `F3 ${regionName}`,
-            description: `Workout locations and schedule for F3 ${regionName}`,
+            title,
+            description,
             type: 'website',
+        },
+        twitter: {
+            card: 'summary',
+            title,
+            description,
         },
     };
 }
