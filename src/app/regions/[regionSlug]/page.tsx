@@ -4,16 +4,17 @@
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { fetchWorkoutLocationsByRegion, fetchRegionSlugs } from '@/utils/fetchWorkoutLocations';
 import { RegionHeader } from '@/components/RegionHeader';
 import { WorkoutList } from '@/components/WorkoutList';
-import { WorkoutLocation } from '@/types/workoutLocation';
 import { sortWorkoutsByDayAndTime } from '@/utils/workoutSorting';
 
 interface RegionProps {
     params: Promise<{
         regionSlug: string;
     }>;
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 export const revalidate = 3600; // Revalidate every hour
@@ -49,8 +50,7 @@ function extractCityAndState(location: string): string {
 }
 
 export async function generateMetadata(
-    { params }: { params: Promise<{ regionSlug: string }> },
-    parent: Promise<Metadata>
+    { params }: { params: Promise<{ regionSlug: string }> }
 ): Promise<Metadata> {
     const resolvedParams = await params;
     const regionSlug = resolvedParams.regionSlug;
@@ -68,33 +68,21 @@ export async function generateMetadata(
     return {
         title,
         description,
-        openGraph: {
-            title,
-            description,
-            type: 'website',
-            siteName: 'F3 Workout Locations',
-            locale: 'en_US',
-        },
-        twitter: {
-            card: 'summary',
-            title,
-            description,
-        },
         keywords: [`F3 ${regionName}`, `F3 ${location}`, 'F3 workouts', 'mens fitness', 'outdoor workouts', 'peer fitness'],
     };
 }
 
-export default async function RegionPage({ params }: RegionProps) {
-    // Wait for params to resolve
+export default async function RegionPage({ params }: Pick<RegionProps, 'params'>) {
     const resolvedParams = await params;
+    const regionSlug = resolvedParams.regionSlug;
 
     // Validate that the region exists
     const regions = await fetchRegionSlugs();
-    if (!regions.includes(resolvedParams.regionSlug)) {
+    if (!regions.includes(regionSlug)) {
         notFound();
     }
 
-    const regionData = await fetchWorkoutLocationsByRegion(resolvedParams.regionSlug);
+    const regionData = await fetchWorkoutLocationsByRegion(regionSlug);
     if (!regionData || regionData.length === 0) {
         notFound();
     }
@@ -123,7 +111,9 @@ export default async function RegionPage({ params }: RegionProps) {
             />
             
             <h2 className="text-2xl font-semibold mb-4">Workouts</h2>
-            <WorkoutList workouts={sortedWorkouts} />
+            <Suspense fallback={<div>Loading workouts...</div>}>
+                <WorkoutList workouts={sortedWorkouts} />
+            </Suspense>
         </div>
     );
 }

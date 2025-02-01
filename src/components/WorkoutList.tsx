@@ -14,8 +14,6 @@ interface WorkoutListProps {
 export function WorkoutList({ workouts }: WorkoutListProps) {
     const searchParams = useSearchParams();
     const [filteredWorkouts, setFilteredWorkouts] = useState(workouts);
-    const [dayFiltered, setDayFiltered] = useState(workouts);
-    const [typeFiltered, setTypeFiltered] = useState(workouts);
 
     // Apply both filters whenever either changes
     useEffect(() => {
@@ -46,11 +44,11 @@ export function WorkoutList({ workouts }: WorkoutListProps) {
             <div className="space-y-4 mb-8">
                 <DayFilter 
                     workouts={workouts}
-                    onFilteredWorkouts={setDayFiltered}
+                    onFilteredWorkouts={setFilteredWorkouts}
                 />
                 <WorkoutTypeFilter 
                     workouts={workouts}
-                    onFilteredWorkouts={setTypeFiltered}
+                    onFilteredWorkouts={setFilteredWorkouts}
                 />
             </div>
             

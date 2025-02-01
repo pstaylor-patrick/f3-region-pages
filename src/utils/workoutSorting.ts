@@ -19,43 +19,6 @@ const DAYS_ORDER = [
 
 type DayOfWeek = typeof DAYS_ORDER[number];
 
-// Map abbreviated days to full names
-const DAY_ALIASES: { [key: string]: string } = {
-    'sun': 'Sunday',
-    'mon': 'Monday',
-    'tue': 'Tuesday',
-    'wed': 'Wednesday',
-    'th': 'Thursday',
-    'thu': 'Thursday',
-    'thur': 'Thursday',
-    'thurs': 'Thursday',
-    'fri': 'Friday',
-    'sat': 'Saturday'
-};
-
-/**
- * Normalize day name to handle abbreviations
- */
-const normalizeDayName = (day: string): string => {
-    const lowercaseDay = day.toLowerCase();
-    // First check aliases
-    if (DAY_ALIASES[lowercaseDay]) {
-        return DAY_ALIASES[lowercaseDay];
-    }
-    // Then check if it's a full day name (case insensitive)
-    const fullDay = DAYS_ORDER.find(d => d.toLowerCase() === lowercaseDay);
-    if (fullDay) {
-        return fullDay;
-    }
-    // Finally check if it's a prefix of any day name
-    for (const fullDayName of DAYS_ORDER) {
-        if (fullDayName.toLowerCase().startsWith(lowercaseDay)) {
-            return fullDayName;
-        }
-    }
-    return day;
-};
-
 interface ParsedTime {
     hour24: number;
     minutes: number;

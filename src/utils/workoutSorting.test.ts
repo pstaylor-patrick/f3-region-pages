@@ -4,15 +4,14 @@ import fixtureData from './__fixtures__/Points.fixture.json';
 
 // Mock current time for consistent testing
 const MOCK_DATE = '2024-02-01T10:30:00'; // Thursday 10:30 AM
-const mockDate = new Date(MOCK_DATE);
 
 // Convert fixture data to WorkoutLocation array
 const createWorkoutsFromFixture = (): WorkoutLocation[] => {
     const headers = fixtureData.values[0];
     return fixtureData.values.slice(1).map(row => {
-        const workout: any = {};
+        const workout: Partial<WorkoutLocation> = {};
         headers.forEach((header: string, index: number) => {
-            workout[header] = row[index];
+            workout[header as keyof WorkoutLocation] = row[index];
         });
         return workout as WorkoutLocation;
     });

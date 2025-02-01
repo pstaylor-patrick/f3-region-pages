@@ -1,6 +1,7 @@
 import { fetchRegionSlugs } from "@/utils/fetchWorkoutLocations";
 import { RegionsClient } from "@/app/regions/regions-client";
 import { Metadata } from "next";
+import { Suspense } from "react";
 
 export const metadata: Metadata = {
   title: "All Regions",
@@ -10,7 +11,11 @@ export const metadata: Metadata = {
 // Create array of all letters A-Z
 const ALL_LETTERS = Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i));
 
-export default async function RegionsPage({ searchParams }: { searchParams: { letter?: string } }) {
+interface RegionsPageProps {
+  searchParams: Promise<{ letter?: string }>;
+}
+
+export default async function RegionsPage({ searchParams }: RegionsPageProps) {
   // Fetch and sort regions
   const [regionSlugs, resolvedParams] = await Promise.all([
     fetchRegionSlugs(),
@@ -52,13 +57,15 @@ export default async function RegionsPage({ searchParams }: { searchParams: { le
         <div className="mb-4 text-sm text-gray-500">
           Found {sortedRegionSlugs.length} regions
         </div>
-        <RegionsClient 
-          regionSlugs={sortedRegionSlugs}
-          currentLetterRegions={currentLetterRegions}
-          currentLetter={currentLetter}
-          availableLetters={ALL_LETTERS}
-          regionsByLetter={regionsByLetter}
-        />
+        <Suspense fallback={<div>Loading regions...</div>}>
+          <RegionsClient 
+            regionSlugs={sortedRegionSlugs}
+            currentLetterRegions={currentLetterRegions}
+            currentLetter={currentLetter}
+            availableLetters={ALL_LETTERS}
+            regionsByLetter={regionsByLetter}
+          />
+        </Suspense>
       </main>
     </div>
   );

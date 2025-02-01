@@ -1,7 +1,3 @@
-import { DAYS_ORDER } from '@/constants';
-
-type DayOfWeek = typeof DAYS_ORDER[number];
-
 export interface WorkoutLocation {
     'Entry ID': string;
     Region: string;

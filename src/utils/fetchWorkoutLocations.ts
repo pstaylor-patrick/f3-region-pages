@@ -1,8 +1,16 @@
-import { WorkoutLocation } from '@/types/workoutLocation';
+import type { WorkoutLocation } from '@/types/workoutLocation';
 import { unstable_cache } from 'next/cache';
 
 type SheetResponse = {
     values: (string[])[];
+}
+
+type RegionData = {
+    regionSlug: string;
+    workouts: Array<{
+        time?: string;
+        data: Record<string, string>;
+    }>;
 }
 
 if (!process.env.GOOGLE_SHEETS_API_KEY) {
@@ -22,108 +30,163 @@ const SHEETS_BASE_URL = `https://sheets.googleapis.com/v4/spreadsheets/${process
 const toKebabCase = (str: string) => 
     str.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 
-// Get today's date in YYYYMMDD format for cache key
-const getTodayKey = () => {
-    const today = new Date();
-    return today.getFullYear().toString() +
-           (today.getMonth() + 1).toString().padStart(2, '0') +
-           today.getDate().toString().padStart(2, '0');
+// Convert time to 12-hour format, handling various input formats
+const convertTo12Hour = (time: string): string => {
+    // Remove any existing AM/PM and extra spaces
+    const cleanTime = time.replace(/\s*[AaPp][Mm]\s*/g, '').trim();
+    
+    try {
+        const [hours, minutesPart] = cleanTime.split(':');
+        if (!minutesPart) return time; // Return original if no minutes part
+
+        const minutes = parseInt(minutesPart, 10);
+        const hoursNum = parseInt(hours, 10);
+        
+        // Validate hours and minutes
+        if (isNaN(hoursNum) || isNaN(minutes) || hoursNum < 0 || hoursNum > 23 || minutes < 0 || minutes > 59) {
+            console.warn(`Invalid time values (hours: ${hoursNum}, minutes: ${minutes}): "${time}"`);
+            return time; // Return original if invalid
+        }
+
+        const period = hoursNum >= 12 ? 'PM' : 'AM';
+        const hours12 = hoursNum % 12 || 12;
+        return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+    } catch (error) {
+        console.warn(`Error parsing time: "${time}"`, error);
+        return time; // Return original if parsing fails
+    }
 };
 
-// Fetch and process the sheet data
-async function fetchSheetData() {
-    try {
-        const res = await fetch(SHEETS_BASE_URL);
+// Normalize time range to 12-hour format
+const normalizeTimeRange = (timeRange: string): string => {
+    // Handle various dash types (hyphen, en-dash, em-dash)
+    const times = timeRange.split(/[-–—]/).map(t => t.trim());
+    return times.map(convertTo12Hour).join(' - ');
+};
 
-        if (!res.ok) {
-            console.error('Failed to fetch sheet data:', res.statusText);
-            return null;
-        }
+// Known workout location fields that we expect from the sheet
+const WORKOUT_FIELDS = [
+    'Entry ID',
+    'Region',
+    'Location',
+    'Group',
+    'Workout Type',
+    'Time',
+    'Type',
+    'Name',
+    'Description',
+    'Notes',
+    'Website',
+    'Latitude',
+    'Longitude',
+    'Marker Icon',
+    'Marker Color',
+    'Icon Color',
+    'Custom Size',
+    'Image'
+] as const;
 
-        const data: SheetResponse = await res.json();
-        
-        const rows = data.values;
-        if (!rows || rows.length < 2) {
-            console.error('Invalid sheet data: no rows found or missing headers');
-            return null;
-        }
+type WorkoutField = typeof WORKOUT_FIELDS[number];
 
-        const headers = rows[0];
-        const regionColumnIndex = headers.indexOf('Region');
-        
-        if (regionColumnIndex === -1) {
-            console.error('Region column not found in sheet');
-            return null;
-        }
-
-        // Create a map of region slugs to row indices for efficient lookup
-        const regionMap = new Map<string, number[]>();
-        
-        rows.slice(1).forEach((row, index) => {
-            const regionSlug = toKebabCase(row[regionColumnIndex]);
-            if (!regionMap.has(regionSlug)) {
-                regionMap.set(regionSlug, []);
-            }
-            regionMap.get(regionSlug)?.push(index);
-        });
-
-        return {
-            headers,
-            rows: rows.slice(1),
-            regionMap
-        };
-    } catch (error) {
-        console.error('Error fetching sheet data:', error);
-        return null;
-    }
+// Type guard to check if a string is a valid workout field
+function isWorkoutField(field: string): field is WorkoutField {
+    return WORKOUT_FIELDS.includes(field as WorkoutField);
 }
 
-// Cache just the region slugs
+// Cache region slugs separately
 const getCachedRegionSlugs = unstable_cache(
-    async () => {
-        const sheetData = await fetchSheetData();
-        if (!sheetData) {
-            console.error('No sheet data returned');
+    async (): Promise<string[]> => {
+        try {
+            const res = await fetch(SHEETS_BASE_URL, {
+                next: { revalidate: 3600 }
+            });
+
+            if (!res.ok) {
+                console.error('Failed to fetch sheet data:', res.statusText);
+                return [];
+            }
+
+            const data: SheetResponse = await res.json();
+            const rows = data.values;
+            if (!rows || rows.length < 2) return [];
+
+            const headers = rows[0];
+            const regionColumnIndex = headers.indexOf('Region');
+            if (regionColumnIndex === -1) return [];
+
+            const regions = new Set<string>();
+            rows.slice(1).forEach(row => {
+                const region = row[regionColumnIndex] || '';
+                regions.add(toKebabCase(region));
+            });
+
+            return Array.from(regions).sort();
+        } catch (error) {
+            console.error('Error fetching region slugs:', error);
             return [];
         }
-        const regions = Array.from(sheetData.regionMap.keys()).sort();
-        return regions;
     },
-    [`region-slugs-${getTodayKey()}`],
-    {
-        revalidate: 86400, // Cache for 24 hours
-        tags: ['region-slugs']
-    }
+    ['region-slugs'],
+    { revalidate: 3600, tags: ['region-slugs'] }
 );
 
-// Cache workout locations for a specific region
-const getCachedWorkoutLocations = unstable_cache(
-    async (regionSlug: string) => {
-        const sheetData = await fetchSheetData();
-        if (!sheetData || !sheetData.regionMap.has(regionSlug)) return null;
-
-        const { headers, rows, regionMap } = sheetData;
-        const indices = regionMap.get(regionSlug) || [];
-
+// Cache workouts for a specific region
+const getCachedRegionWorkouts = unstable_cache(
+    async (regionSlug: string): Promise<RegionData | null> => {
         try {
-            return indices.map(index => {
-                const row = rows[index];
-                const rowData = {} as WorkoutLocation;
-                headers.forEach((header: string, i: number) => {
-                    (rowData as any)[header] = row[i] || '';
-                });
-                return rowData;
+            const res = await fetch(SHEETS_BASE_URL, {
+                next: { revalidate: 3600 }
             });
+
+            if (!res.ok) {
+                console.error('Failed to fetch sheet data:', res.statusText);
+                return null;
+            }
+
+            const data: SheetResponse = await res.json();
+            const rows = data.values;
+            if (!rows || rows.length < 2) return null;
+
+            const headers = rows[0];
+            const regionColumnIndex = headers.indexOf('Region');
+            const timeColumnIndex = headers.indexOf('Time');
+            
+            if (regionColumnIndex === -1) {
+                console.error('Region column not found');
+                return null;
+            }
+
+            const workouts: RegionData['workouts'] = [];
+            
+            rows.slice(1).forEach(row => {
+                const region = row[regionColumnIndex] || '';
+                const currentRegionSlug = toKebabCase(region);
+                
+                if (currentRegionSlug === regionSlug) {
+                    const time = timeColumnIndex !== -1 ? normalizeTimeRange(row[timeColumnIndex] || '') : undefined;
+                    const data: Record<string, string> = {};
+                    
+                    headers.forEach((header, i) => {
+                        if (isWorkoutField(header) && row[i] && header !== 'Time') {
+                            data[header] = row[i];
+                        }
+                    });
+
+                    workouts.push({ time, data });
+                }
+            });
+
+            return {
+                regionSlug,
+                workouts
+            };
         } catch (error) {
-            console.error('Error processing workout locations:', error);
+            console.error('Error fetching workouts for region:', error);
             return null;
         }
     },
-    [`workout-locations-${getTodayKey()}`],
-    {
-        revalidate: 86400, // Cache for 24 hours
-        tags: ['workout-locations']
-    }
+    ['region-workouts'],
+    { revalidate: 3600, tags: ['region-workouts'] }
 );
 
 export const fetchRegionSlugs = async (): Promise<string[]> => {
@@ -131,5 +194,11 @@ export const fetchRegionSlugs = async (): Promise<string[]> => {
 }
 
 export const fetchWorkoutLocationsByRegion = async (regionSlug: string): Promise<WorkoutLocation[] | null> => {
-    return getCachedWorkoutLocations(regionSlug);
+    const regionData = await getCachedRegionWorkouts(regionSlug);
+    if (!regionData) return null;
+
+    return regionData.workouts.map(workout => ({
+        ...workout.data,
+        Time: workout.time || ''
+    } as WorkoutLocation));
 } 

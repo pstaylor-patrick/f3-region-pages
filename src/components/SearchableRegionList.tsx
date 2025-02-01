@@ -88,33 +88,39 @@ export default function SearchableRegionList({
     <div className="w-full">
       <div className="relative mb-6">
         <div className="relative">
-          <input
-            ref={inputRef}
-            type="text"
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setSelectedIndex(-1);
-              if (!e.target.value) {
-                router.push(`/regions?letter=${currentLetter.toLowerCase()}`);
-              }
-            }}
-            onKeyDown={handleKeyDown}
-            placeholder="Search regions..."
-            className="w-full p-4 rounded-lg border border-gray-200 dark:border-gray-700 
-              bg-white dark:bg-gray-800 
-              text-gray-900 dark:text-gray-100
-              focus:border-gray-300 dark:focus:border-gray-600 
-              focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-700 
-              outline-none transition-all
-              placeholder-gray-500 dark:placeholder-gray-400
-              disabled:opacity-50"
-            aria-label="Search regions"
+          <div 
+            role="combobox" 
             aria-expanded={searchQuery.length > 0}
             aria-controls="search-suggestions"
-            aria-activedescendant={selectedIndex >= 0 ? `suggestion-${filteredRegions[selectedIndex]}` : undefined}
-            disabled={isLoading}
-          />
+            aria-haspopup="listbox"
+          >
+            <input
+              ref={inputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setSelectedIndex(-1);
+                if (!e.target.value) {
+                  router.push(`/regions?letter=${currentLetter.toLowerCase()}`);
+                }
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder="Search regions..."
+              className="w-full p-4 rounded-lg border border-gray-200 dark:border-gray-700 
+                bg-white dark:bg-gray-800 
+                text-gray-900 dark:text-gray-100
+                focus:border-gray-300 dark:focus:border-gray-600 
+                focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-700 
+                outline-none transition-all
+                placeholder-gray-500 dark:placeholder-gray-400
+                disabled:opacity-50"
+              aria-label="Search regions"
+              aria-activedescendant={selectedIndex >= 0 ? `suggestion-${filteredRegions[selectedIndex]}` : undefined}
+              aria-autocomplete="list"
+              disabled={isLoading}
+            />
+          </div>
           {isLoading && (
             <div className="absolute right-3 top-1/2 -translate-y-1/2">
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900 dark:border-gray-100" />
@@ -279,9 +285,9 @@ export default function SearchableRegionList({
 
       {filteredRegions.length === 0 && searchQuery && (
         <div className="text-center text-gray-500 dark:text-gray-400 py-8">
-          No regions found matching "{searchQuery}"
+          No regions found matching &quot;{searchQuery}&quot;
         </div>
       )}
     </div>
   );
-} 
+}
