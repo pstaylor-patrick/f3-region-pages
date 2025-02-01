@@ -29,9 +29,18 @@ const parseTime = (timeStr: string): number => {
 
 export const sortWorkoutsByDayAndTime = (workouts: WorkoutLocation[]): WorkoutLocation[] => {
     return [...workouts].sort((a, b) => {
+        // Get day indices (default to -1 if not found)
+        const dayIndexA = DAYS_ORDER.indexOf(a.Group);
+        const dayIndexB = DAYS_ORDER.indexOf(b.Group);
+
+        // If either day is not found, put it at the end
+        if (dayIndexA === -1) return 1;
+        if (dayIndexB === -1) return -1;
+
         // First sort by day
-        const dayDiff = DAYS_ORDER.indexOf(a.Day) - DAYS_ORDER.indexOf(b.Day);
-        if (dayDiff !== 0) return dayDiff;
+        if (dayIndexA !== dayIndexB) {
+            return dayIndexA - dayIndexB;
+        }
         
         // Then sort by time
         return parseTime(a.Time) - parseTime(b.Time);
