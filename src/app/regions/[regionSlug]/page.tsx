@@ -9,87 +9,62 @@ import { fetchWorkoutLocationsByRegion, fetchRegionSlugs } from '@/utils/fetchWo
 import { RegionHeader } from '@/components/RegionHeader';
 import { WorkoutList } from '@/components/WorkoutList';
 import { sortWorkoutsByDayAndTime } from '@/utils/workoutSorting';
+import { calculateMapParameters, getMapUrl } from '@/utils/mapUtils';
+import { extractCityAndState } from '@/utils/locationUtils';
 
 interface RegionProps {
     params: Promise<{
         regionSlug: string;
     }>;
-    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 export const revalidate = 3600; // Revalidate every hour
 
+// Generate static paths for all regions
 export async function generateStaticParams() {
-    const regions = await fetchRegionSlugs();
-    return regions.map((regionSlug: string) => ({
-        regionSlug,
+    const slugs = await fetchRegionSlugs();
+    return slugs.map((slug) => ({
+        regionSlug: slug,
     }));
-}
-
-// Helper function to extract city and state from address
-function extractCityAndState(location: string): string {
-    const parts = location.split(',').map(part => part.trim());
-    
-    // Check if this is a US address (contains a 2-letter state code)
-    const stateIndex = parts.findIndex(part => /^\s*[A-Z]{2}\b/.test(part));
-    
-    if (stateIndex > 0) {
-        // US address format
-        const city = parts[stateIndex - 1];
-        const state = parts[stateIndex].trim().split(' ')[0]; // Get just the state abbreviation
-        return `${city}, ${state}`;
-    } else {
-        // International address - find the country (usually the last non-empty part)
-        const country = parts.reverse().find(part => 
-            part && 
-            !/^\d+$/.test(part) && // Skip postal codes
-            !/^[A-Z0-9\s-]+$/.test(part) // Skip postal codes in various formats
-        );
-        return country || location;
-    }
 }
 
 export async function generateMetadata(
     { params }: { params: Promise<{ regionSlug: string }> }
 ): Promise<Metadata> {
-    const resolvedParams = await params;
-    const regionSlug = resolvedParams.regionSlug;
-    const workouts = await fetchWorkoutLocationsByRegion(regionSlug);
-    
-    if (!workouts || workouts.length === 0) {
-        return notFound();
+    const { regionSlug } = await params;
+    const regionData = await fetchWorkoutLocationsByRegion(regionSlug);
+
+    if (!regionData?.length) {
+        return {
+            title: 'Region Not Found',
+            description: 'The requested F3 region could not be found.',
+        };
     }
-    
-    const regionName = workouts[0].Region;
-    const location = extractCityAndState(workouts[0].Location);
-    const title = `F3 Workouts in ${regionName} - ${location}`;
-    const description = `Find F3 workout locations and schedules in the ${regionName} region. Join us for workouts in ${location}. Free, peer-led outdoor workouts for men.`;
-    
+
+    const regionName = regionData[0].Region;
+    const locations = regionData.map(workout => extractCityAndState(workout.Location));
+    const uniqueLocations = [...new Set(locations)];
+    const locationString = uniqueLocations.slice(0, 3).join(', ') + 
+        (uniqueLocations.length > 3 ? ', and more' : '');
+
     return {
-        title,
-        description,
-        keywords: [`F3 ${regionName}`, `F3 ${location}`, 'F3 workouts', 'mens fitness', 'outdoor workouts', 'peer fitness'],
+        title: `F3 ${regionName} Workouts`,
+        description: `Find F3 workouts in ${regionName}, serving ${locationString}. Join us for free, peer-led workouts in your area.`,
     };
 }
 
 export default async function RegionPage({ params }: Pick<RegionProps, 'params'>) {
-    const resolvedParams = await params;
-    const regionSlug = resolvedParams.regionSlug;
-
-    // Validate that the region exists
-    const regions = await fetchRegionSlugs();
-    if (!regions.includes(regionSlug)) {
-        notFound();
-    }
-
+    const { regionSlug } = await params;
     const regionData = await fetchWorkoutLocationsByRegion(regionSlug);
-    if (!regionData || regionData.length === 0) {
+
+    if (!regionData?.length) {
         notFound();
     }
 
     const regionName = regionData[0].Region;
     const website = regionData[0].Website;
     const sortedWorkouts = sortWorkoutsByDayAndTime(regionData);
+    const mapParams = calculateMapParameters(regionData);
 
     return (
         <div className="max-w-4xl mx-auto p-6">
@@ -105,10 +80,27 @@ export default async function RegionPage({ params }: Pick<RegionProps, 'params'>
                 </Link>
             </div>
 
-            <RegionHeader 
+            <div className="mb-8">
+                <h1 className="text-4xl font-bold mb-2">F3 {regionName}</h1>
+                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                    Free, peer-led workouts for men. Open to all men, held outdoors, 
+                    rain or shine, hot or cold.
+                </p>
+            </div>
+
+            <RegionHeader
                 regionName={regionName}
                 website={website}
             />
+            
+            <div className="mb-8">
+                <iframe
+                    src={getMapUrl(mapParams)}
+                    className="w-full h-[400px] rounded-lg border border-gray-200 dark:border-gray-700"
+                    title={`F3 ${regionName} Workout Locations Map`}
+                    loading="lazy"
+                />
+            </div>
             
             <h2 className="text-2xl font-semibold mb-4">Workouts</h2>
             <Suspense fallback={<div>Loading workouts...</div>}>
