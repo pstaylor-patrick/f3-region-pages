@@ -52,20 +52,11 @@ export function calculateHaversineDistance(lat1: number, lon1: number, lat2: num
  * @returns URL string for the F3 Nation map
  */
 export function getMapUrl(params: MapParameters): string {
-    const { center, zoom, markers } = params;
-    const baseUrl = 'https://www.google.com/maps/embed/v1/view';
-    const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    const { center, zoom } = params;
+    const baseUrl = 'https://map.f3nation.com';
 
-    if (!key) {
-        console.error('Google Maps API key not found');
-        return '';
-    }
-
-    const markerParams = markers.map(marker => 
-        `&markers=color:red|${marker.lat},${marker.lng}`
-    ).join('');
-
-    return `${baseUrl}?key=${key}&center=${center.lat},${center.lng}&zoom=${zoom}${markerParams}`;
+    // F3 Nation map uses a simple URL structure
+    return `${baseUrl}/?lat=${center.lat}&lon=${center.lng}&zoom=${zoom}`;
 }
 
 /**
@@ -97,21 +88,32 @@ export function calculateMapParameters(workouts: Array<{ Latitude: string; Longi
     const minLng = Math.min(...lngs);
     const maxLng = Math.max(...lngs);
 
-    // Calculate center
+    // Add padding to the bounds (about 20% on each side)
+    const latPadding = (maxLat - minLat) * 0.2;
+    const lngPadding = (maxLng - minLng) * 0.2;
+    const paddedMinLat = minLat - latPadding;
+    const paddedMaxLat = maxLat + latPadding;
+    const paddedMinLng = minLng - lngPadding;
+    const paddedMaxLng = maxLng + lngPadding;
+
+    // Calculate center using padded bounds
     const center = {
-        lat: (minLat + maxLat) / 2,
-        lng: (minLng + maxLng) / 2
+        lat: (paddedMinLat + paddedMaxLat) / 2,
+        lng: (paddedMinLng + paddedMaxLng) / 2
     };
 
-    // Calculate appropriate zoom level
-    const latDiff = maxLat - minLat;
-    const lngDiff = maxLng - minLng;
+    // Calculate appropriate zoom level with adjusted formula
+    const latDiff = paddedMaxLat - paddedMinLat;
+    const lngDiff = paddedMaxLng - paddedMinLng;
     const maxDiff = Math.max(latDiff, lngDiff);
-    const zoom = Math.floor(14 - Math.log2(maxDiff));
+    
+    // Adjust zoom calculation to be less aggressive
+    // Start at zoom level 15 and subtract based on the size of the area
+    const zoom = Math.floor(15.5 - Math.log2(maxDiff * 111)); // 111km per degree at equator
 
     return {
         center,
-        zoom: Math.min(Math.max(zoom, 4), 15), // Clamp between 4 and 15
+        zoom: Math.min(Math.max(zoom, 4), 13), // Clamp between 4 and 13
         markers
     };
 } 
