@@ -114,13 +114,24 @@ const getCachedRegionSlugs = unstable_cache(
             const regionColumnIndex = headers.indexOf('Region');
             if (regionColumnIndex === -1) return [];
 
+            // Create a Set to store unique regions
             const regions = new Set<string>();
+            
+            // Process each row
             rows.slice(1).forEach(row => {
-                const region = row[regionColumnIndex] || '';
-                regions.add(toKebabCase(region));
+                const region = row[regionColumnIndex];
+                if (region) {
+                    // Only add non-empty regions
+                    regions.add(region.trim());
+                }
             });
 
-            return Array.from(regions).sort();
+            // Convert to array and sort case-insensitively
+            return Array.from(regions)
+                .filter(region => region) // Remove any empty strings
+                .map(region => toKebabCase(region))
+                .sort((a, b) => a.localeCompare(b));
+
         } catch (error) {
             console.error('Error fetching region slugs:', error);
             return [];
@@ -159,7 +170,9 @@ const getCachedRegionWorkouts = unstable_cache(
             const workouts: RegionData['workouts'] = [];
             
             rows.slice(1).forEach(row => {
-                const region = row[regionColumnIndex] || '';
+                const region = row[regionColumnIndex]?.trim() || '';
+                if (!region) return; // Skip rows with no region
+                
                 const currentRegionSlug = toKebabCase(region);
                 
                 if (currentRegionSlug === regionSlug) {
@@ -167,14 +180,24 @@ const getCachedRegionWorkouts = unstable_cache(
                     const data: Record<string, string> = {};
                     
                     headers.forEach((header, i) => {
-                        if (isWorkoutField(header) && row[i] && header !== 'Time') {
-                            data[header] = row[i];
+                        if (isWorkoutField(header) && row[i]) {
+                            // Store the original region name, not the slug
+                            if (header === 'Region') {
+                                data[header] = region;
+                            } else if (header !== 'Time') {
+                                data[header] = row[i];
+                            }
                         }
                     });
 
                     workouts.push({ time, data });
                 }
             });
+
+            if (workouts.length === 0) {
+                console.warn(`No workouts found for region slug: ${regionSlug}`);
+                return null;
+            }
 
             return {
                 regionSlug,

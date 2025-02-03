@@ -4,8 +4,6 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { WorkoutLocation } from '@/types/workoutLocation';
 import { WorkoutCard } from '@/components/WorkoutCard';
-import { DayFilter } from '@/components/DayFilter';
-import { WorkoutTypeFilter } from '@/components/WorkoutTypeFilter';
 
 interface WorkoutListProps {
     workouts: WorkoutLocation[];
@@ -41,17 +39,6 @@ export function WorkoutList({ workouts }: WorkoutListProps) {
 
     return (
         <div>
-            <div className="space-y-4 mb-8">
-                <DayFilter 
-                    workouts={workouts}
-                    onFilteredWorkouts={setFilteredWorkouts}
-                />
-                <WorkoutTypeFilter 
-                    workouts={workouts}
-                    onFilteredWorkouts={setFilteredWorkouts}
-                />
-            </div>
-            
             <div className="grid gap-4 md:grid-cols-2">
                 {filteredWorkouts.map((workout: WorkoutLocation) => (
                     <WorkoutCard 
