@@ -20,6 +20,9 @@ export const metadata: Metadata = {
   },
   description: SITE_CONFIG.description,
   metadataBase: new URL(SITE_CONFIG.url),
+  icons: {
+    icon: '/f3-icon.webp',
+  },
   openGraph: {
     title: SITE_CONFIG.title,
     description: SITE_CONFIG.description,
@@ -46,9 +49,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="min-h-full">
-      <head>
-        <link rel="icon" href="/favicon.ico" sizes="any" />
-      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100`}
       >
