@@ -8,19 +8,53 @@ import { RegionHeader } from '@/components/RegionHeader';
 import { WorkoutList } from '@/components/WorkoutList';
 import { WorkoutFilters } from '@/components/WorkoutFilters';
 import { getMapUrl } from '@/utils/mapUtils';
+import type { MapParameters } from '@/utils/mapUtils';
 
 interface RegionContentProps { 
     regionName: string;
     website?: string;
     sortedWorkouts: WorkoutLocation[];
-    mapParams: any;
+    mapParams: MapParameters;
 }
 
-export function RegionContent({ regionName, website, sortedWorkouts, mapParams }: RegionContentProps) {
+function FilteredContent({ sortedWorkouts, mapParams }: { sortedWorkouts: WorkoutLocation[]; mapParams: MapParameters }) {
     const searchParams = useSearchParams();
     const hasActiveFilters = searchParams.has('day') || searchParams.has('type');
     const [filteredWorkouts, setFilteredWorkouts] = useState(sortedWorkouts);
 
+    return (
+        <>
+            <div className="sticky top-4 z-10 bg-white dark:bg-gray-800/95 backdrop-blur-sm px-4 py-3 rounded-lg shadow-lg mb-8 border border-gray-100 dark:border-gray-700/50">
+                <Suspense fallback={<div>Loading filters...</div>}>
+                    <WorkoutFilters 
+                        workouts={sortedWorkouts}
+                        onFilteredWorkouts={setFilteredWorkouts}
+                    />
+                </Suspense>
+            </div>
+
+            {!hasActiveFilters && (
+                <div className="mb-8">
+                    <iframe
+                        src={getMapUrl(mapParams)}
+                        className="w-full h-[400px] rounded-lg border border-gray-200 dark:border-gray-700"
+                        title={`F3 Workout Locations Map`}
+                        loading="lazy"
+                    />
+                </div>
+            )}
+            
+            <div className="mb-8">
+                <h2 className="text-2xl font-semibold mb-4">Workouts</h2>
+                <Suspense fallback={<div>Loading workouts...</div>}>
+                    <WorkoutList workouts={filteredWorkouts} />
+                </Suspense>
+            </div>
+        </>
+    );
+}
+
+export function RegionContent({ regionName, website, sortedWorkouts, mapParams }: RegionContentProps) {
     return (
         <div className="max-w-4xl mx-auto p-6">
             <div className="mb-6">
@@ -48,32 +82,9 @@ export function RegionContent({ regionName, website, sortedWorkouts, mapParams }
                 website={website}
             />
             
-            <div className="sticky top-4 z-10 bg-white dark:bg-gray-800/95 backdrop-blur-sm px-4 py-3 rounded-lg shadow-lg mb-8 border border-gray-100 dark:border-gray-700/50">
-                <Suspense fallback={<div>Loading filters...</div>}>
-                    <WorkoutFilters 
-                        workouts={sortedWorkouts}
-                        onFilteredWorkouts={setFilteredWorkouts}
-                    />
-                </Suspense>
-            </div>
-
-            {!hasActiveFilters && (
-                <div className="mb-8">
-                    <iframe
-                        src={getMapUrl(mapParams)}
-                        className="w-full h-[400px] rounded-lg border border-gray-200 dark:border-gray-700"
-                        title={`F3 ${regionName} Workout Locations Map`}
-                        loading="lazy"
-                    />
-                </div>
-            )}
-            
-            <div className="mb-8">
-                <h2 className="text-2xl font-semibold mb-4">Workouts</h2>
-                <Suspense fallback={<div>Loading workouts...</div>}>
-                    <WorkoutList workouts={filteredWorkouts} />
-                </Suspense>
-            </div>
+            <Suspense fallback={<div>Loading content...</div>}>
+                <FilteredContent sortedWorkouts={sortedWorkouts} mapParams={mapParams} />
+            </Suspense>
         </div>
     );
 } 
