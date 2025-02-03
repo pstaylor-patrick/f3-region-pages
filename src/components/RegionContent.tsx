@@ -21,6 +21,7 @@ function FilteredContent({ sortedWorkouts, mapParams }: { sortedWorkouts: Workou
     const searchParams = useSearchParams();
     const hasActiveFilters = searchParams.has('day') || searchParams.has('type');
     const [filteredWorkouts, setFilteredWorkouts] = useState(sortedWorkouts);
+    const mapUrl = getMapUrl(mapParams);
 
     return (
         <>
@@ -36,10 +37,11 @@ function FilteredContent({ sortedWorkouts, mapParams }: { sortedWorkouts: Workou
             {!hasActiveFilters && (
                 <div className="mb-8">
                     <iframe
-                        src={getMapUrl(mapParams)}
+                        src={mapUrl}
                         className="w-full h-[400px] rounded-lg border border-gray-200 dark:border-gray-700"
                         title={`F3 Workout Locations Map`}
                         loading="lazy"
+                        allowFullScreen
                     />
                 </div>
             )}
