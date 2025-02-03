@@ -1,5 +1,5 @@
 {
-    "$schema": "./schema.json",
+    "$schema": "./Points.schema.json",
     "range": "Points!A1:AH5",
     "majorDimension": "ROWS",
     "values": [
